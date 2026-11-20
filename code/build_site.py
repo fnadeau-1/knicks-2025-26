@@ -1,135 +1,183 @@
 """
-Build the static web page for Render.
+Build the interactive dashboard for Render.
 
-    python code/build_site.py   ->  site/index.html + site/img/*.png
+    python code/build_site.py   ->  site/index.html
 
-Render runs this as the static site's build command and publishes the site/ folder.
-Open site/index.html locally to preview.
+Python does the data work: it parses the play-by-play into compact, columnar
+records (shots, rebounds, steals, blocks, assists, games, players) and embeds
+them as JSON in code/dashboard.html. All filtering and charting happens in the
+browser, so the page is a static site that works offline too.
 """
 
-import html
-from pathlib import Path
+import json
+import re
 
-import matplotlib
+import numpy as np
+import pandas as pd
 
-matplotlib.use("Agg")  # no display on the build server
+from knicks_2026 import ROOT, TEAM, clock_to_sec, load_games
 
-from knicks_2026 import ROOT, build_all  # noqa: E402
-
+HERE = ROOT / "code"
 SITE = ROOT / "site"
-IMG = SITE / "img"
+TEMPLATE = HERE / "dashboard.html"
 
-CHARTS = [
-    ("1_shot_heatmap.png", "Where the shots came from",
-     "Every Knicks field-goal attempt on a half court. Darker hexes mean more attempts. "
-     "Most shots come at the rim and from beyond the arc, especially the corners."),
-    ("2_shot_type.png", "Shot type",
-     "How many attempts each shot type got, and how often each one went in."),
-    ("3_efficiency_by_minute.png", "Efficiency throughout the game",
-     "Effective FG% (3-pointers count 1.5×) for each minute of regulation, "
-     "with a 3-minute rolling average."),
-    ("4_leaderboards.png", "Leaderboards",
-     "Top five Knicks in points, rebounds, assists and 3-pointers made."),
-]
+# NBA team ids (used for logo URLs on cdn.nba.com)
+TEAM_IDS = {
+    "ATL": 1610612737, "BOS": 1610612738, "CLE": 1610612739, "NOP": 1610612740,
+    "CHI": 1610612741, "DAL": 1610612742, "DEN": 1610612743, "GSW": 1610612744,
+    "HOU": 1610612745, "LAC": 1610612746, "LAL": 1610612747, "MIA": 1610612748,
+    "MIL": 1610612749, "MIN": 1610612750, "BKN": 1610612751, "NYK": 1610612752,
+    "ORL": 1610612753, "IND": 1610612754, "PHI": 1610612755, "PHX": 1610612756,
+    "POR": 1610612757, "SAC": 1610612758, "SAS": 1610612759, "OKC": 1610612760,
+    "TOR": 1610612761, "UTA": 1610612762, "MEM": 1610612763, "WAS": 1610612764,
+    "DET": 1610612765, "CHA": 1610612766,
+}
 
-PAGE = """<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Knicks 2025-26</title>
-<meta name="description" content="Shot charts, efficiency and leaderboards for the 2025-26 New York Knicks.">
-<style>
-  :root {{
-    --bg: #fcfcfb; --card: #ffffff; --ink: #0b0b0b; --ink-2: #52514e;
-    --line: #e4e3df; --accent: #2a78d6;
-  }}
-  * {{ box-sizing: border-box; }}
-  body {{
-    margin: 0; background: var(--bg); color: var(--ink);
-    font: 16px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  }}
-  main {{ max-width: 1080px; margin: 0 auto; padding: 48px 16px 64px; }}
-  header p.kicker {{
-    margin: 0 0 6px; color: var(--accent); font-weight: 700;
-    letter-spacing: .08em; text-transform: uppercase; font-size: 13px;
-  }}
-  h1 {{ margin: 0 0 8px; font-size: clamp(28px, 5vw, 44px); line-height: 1.1; }}
-  header p.lede {{ margin: 0; color: var(--ink-2); max-width: 60ch; }}
-  .stats {{
-    display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-    gap: 12px; margin: 32px 0 40px;
-  }}
-  .stat {{ background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; }}
-  .stat .v {{ font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; }}
-  .stat .k {{ color: var(--ink-2); font-size: 13px; }}
-  section {{
-    background: var(--card); border: 1px solid var(--line); border-radius: 12px;
-    padding: 24px; margin-bottom: 24px;
-  }}
-  section h2 {{ margin: 0 0 4px; font-size: 20px; }}
-  section p {{ margin: 0 0 16px; color: var(--ink-2); }}
-  section img {{ display: block; width: 100%; height: auto; }}
-  .narrow img {{ max-width: 640px; margin: 0 auto; }}
-  footer {{ color: var(--ink-2); font-size: 13px; margin-top: 32px; }}
-</style>
-</head>
-<body>
-<main>
-  <header>
-    <p class="kicker">New York Knicks · 2025-26</p>
-    <h1>The Knicks Championship Run</h1>
-    <p class="lede">Where the shots came from, what kind of shots they were, how efficiency
-    moved through a game, and who led the team.</p>
-  </header>
+# Shot categories, in radar order. Index 0 = free throw.
+CATS = ["Free throw", "Layup", "Dunk", "Hook", "Floater", "Midrange", "3-pointer"]
+# Event kinds
+EVENT_KINDS = ["OREB", "DREB", "STL", "BLK", "TOV", "PF"]
 
-  <div class="stats">
-{stats}
-  </div>
 
-{sections}
+def shot_cat(subtype: str, is3: bool) -> int:
+    if is3:
+        return 6
+    s = str(subtype).lower()
+    if "dunk" in s:
+        return 2
+    if "hook" in s:
+        return 3
+    if "float" in s:
+        return 4
+    if "layup" in s or "finger roll" in s or "tip" in s:
+        return 1
+    return 5  # 2-pt jumpers: pull-ups, fadeaways, step-backs...
 
-  <footer>
-    Source: NBA play-by-play, 2025-26 regular season ({games} games).
-    Per-game leaderboard values divide season totals by team games played.
-  </footer>
-</main>
-</body>
-</html>
-"""
+
+def elapsed(period: int, clock: str) -> int:
+    s = clock_to_sec(clock)
+    if period <= 4:
+        return int((period - 1) * 720 + 720 - s)
+    return int(2880 + (period - 5) * 300 + 300 - s)
+
+
+def last_name(name: str) -> str:
+    return str(name).split(". ", 1)[-1]
+
+
+def build_data() -> dict:
+    df = load_games().reset_index(drop=True)
+    df["row"] = np.arange(len(df))
+    nyk = df[(df["team"] == TEAM) & (df["playerid"] != 0)].copy()
+
+    # ---- players
+    roster = (nyk.dropna(subset=["player"])
+              .groupby("playerid")["player"].agg(lambda s: s.mode().iloc[0]))
+    # ---- games (sorted by id = schedule order)
+    game_ids = sorted(df["gameid"].unique())
+    gidx = {g: i for i, g in enumerate(game_ids)}
+
+    nyk["g"] = nyk["gameid"].map(gidx)
+    nyk["q"] = nyk["period"].clip(upper=5).astype(int)
+    nyk["t"] = [elapsed(p, c) for p, c in zip(nyk["period"], nyk["clock"])]
+
+    # ---- shots: field goals + free throws
+    fga = nyk[nyk["type"].isin(["Made Shot", "Missed Shot"])].copy()
+    fga["is3"] = fga["desc"].str.contains("3PT", na=False)
+    fga["c"] = [shot_cat(s, t) for s, t in zip(fga["subtype"], fga["is3"])]
+    fga["m"] = fga["type"].eq("Made Shot").astype(int)
+    fga["v"] = np.where(fga["is3"], 3, 2)
+
+    fta = nyk[nyk["type"] == "Free Throw"].copy()
+    fta["c"] = 0
+    fta["m"] = (~fta["desc"].str.startswith("MISS", na=False)).astype(int)
+    fta["v"] = 1
+    fta[["x", "y"]] = 0
+
+    # assister: "(Towns 1 AST)" -> player id, resolved against that game's roster
+    game_roster = (nyk.dropna(subset=["player"])
+                   .assign(last=lambda d: d["player"].map(last_name))
+                   .drop_duplicates(["gameid", "last"])
+                   .set_index(["gameid", "last"])["playerid"])
+    ast_last = fga["desc"].str.extract(r"\(([^()]+?) \d+ AST\)")[0]
+    fga["a"] = [game_roster.get((g, n), -1) if isinstance(n, str) else -1
+                for g, n in zip(fga["gameid"], ast_last)]
+    fta["a"] = -1
+
+    shots = pd.concat([fga, fta]).sort_values("row")
+
+    # ---- events: rebounds (off/def from running counters), steals, blocks, TOV, fouls
+    reb = nyk[nyk["type"] == "Rebound"].copy()
+    counts = reb["desc"].str.extract(r"Off:(\d+) Def:(\d+)").astype(float)
+    reb["off"] = counts[0]
+    reb = reb.dropna(subset=["off"]).sort_values("row")
+    prev = reb.groupby(["gameid", "playerid"])["off"].shift(fill_value=0)
+    reb["k"] = np.where(reb["off"] > prev, 0, 1)
+
+    stl = nyk[nyk["desc"].str.contains(r" STEAL \(", na=False)].assign(k=2)
+    blk = nyk[nyk["desc"].str.contains(r" BLOCK \(", na=False)].assign(k=3)
+    tov = nyk[nyk["type"] == "Turnover"].assign(k=4)
+    pf = nyk[nyk["type"] == "Foul"].assign(k=5)
+    events = pd.concat([reb, stl, blk, tov, pf]).sort_values("row")
+
+    # ---- player index (sorted by points)
+    pts = shots.loc[shots["m"] == 1].groupby("playerid")["v"].sum()
+    order = sorted(roster.index, key=lambda pid: -pts.get(pid, 0))
+    pidx = {pid: i for i, pid in enumerate(order)}
+    players = [{"id": int(pid), "name": roster[pid], "last": last_name(roster[pid]),
+                "pts": int(pts.get(pid, 0))} for pid in order]
+
+    # ---- game metadata
+    games = []
+    team_pts = shots.loc[shots["m"] == 1].groupby("gameid")["v"].sum()
+    appear = nyk.groupby("gameid")["playerid"].unique()
+    for gid in game_ids:
+        g = df[df["gameid"] == gid]
+        opp = g["team"].dropna()
+        opp = opp[opp != TEAM].mode().iloc[0]
+        h, a = g["h_pts"].max(), g["a_pts"].max()
+        mine = team_pts.get(gid, 0)
+        home = abs(mine - h) <= abs(mine - a)
+        nyk_pts, opp_pts = (h, a) if home else (a, h)
+        games.append({
+            "id": gid, "opp": opp, "oppId": TEAM_IDS.get(opp, 0), "home": bool(home),
+            "pts": int(nyk_pts), "oppPts": int(opp_pts), "win": bool(nyk_pts > opp_pts),
+            "ot": int(max(g["period"].max() - 4, 0)),
+            "players": sorted(pidx[p] for p in appear.get(gid, []) if p in pidx),
+        })
+
+    def cols(frame, spec):
+        return {k: [int(v) for v in f(frame)] for k, f in spec.items()}
+
+    return {
+        "team": TEAM, "teamId": TEAM_IDS[TEAM], "season": "2025-26",
+        "cats": CATS, "eventKinds": EVENT_KINDS,
+        "players": players, "games": games,
+        "shots": cols(shots, {
+            "g": lambda d: d["g"], "p": lambda d: d["playerid"].map(pidx),
+            "q": lambda d: d["q"], "t": lambda d: d["t"], "c": lambda d: d["c"],
+            "m": lambda d: d["m"], "v": lambda d: d["v"],
+            "x": lambda d: d["x"].fillna(0).round(), "y": lambda d: d["y"].fillna(0).round(),
+            "a": lambda d: d["a"].map(lambda pid: pidx.get(pid, -1)),
+        }),
+        "events": cols(events, {
+            "g": lambda d: d["g"], "p": lambda d: d["playerid"].map(pidx),
+            "q": lambda d: d["q"], "k": lambda d: d["k"],
+        }),
+    }
 
 
 def main():
-    IMG.mkdir(parents=True, exist_ok=True)
-    summary, figs = build_all()
-
-    for name, fig in figs.items():
-        fig.savefig(IMG / name, dpi=150)
-
-    stats = [
-        (summary["games"], "Games"),
-        (f"{summary['fga']:,}", "Shot attempts"),
-        (f"{summary['efg']:.1%}", "Effective FG%"),
-        (f"{summary['fg3m']:,}", "3-pointers made"),
-        (summary["top_scorer"], "Top scorer"),
-    ]
-    stats_html = "\n".join(
-        f'    <div class="stat"><div class="v">{html.escape(str(v))}</div>'
-        f'<div class="k">{k}</div></div>'
-        for v, k in stats
-    )
-    sections_html = "\n".join(
-        f'  <section{" class=\"narrow\"" if fname.startswith("1_") else ""}>\n'
-        f"    <h2>{title}</h2>\n    <p>{desc}</p>\n"
-        f'    <img src="img/{fname}" alt="{title} chart" loading="lazy">\n  </section>'
-        for fname, title, desc in CHARTS
-    )
-
-    (SITE / "index.html").write_text(
-        PAGE.format(stats=stats_html, sections=sections_html, games=summary["games"]),
-        encoding="utf-8",
-    )
-    print(f"Built {SITE / 'index.html'}")
+    data = build_data()
+    SITE.mkdir(exist_ok=True)
+    payload = json.dumps(data, separators=(",", ":"))
+    page = TEMPLATE.read_text(encoding="utf-8").replace("/*__DATA__*/null", payload)
+    (SITE / "index.html").write_text(page, encoding="utf-8")
+    w = sum(g["win"] for g in data["games"])
+    print(f"{len(data['games'])} games ({w}-{len(data['games']) - w}), "
+          f"{len(data['shots']['g']):,} shots, {len(data['events']['g']):,} events, "
+          f"{len(data['players'])} players")
+    print(f"Built {SITE / 'index.html'} ({len(page) / 1024:.0f} KB)")
 
 
 if __name__ == "__main__":

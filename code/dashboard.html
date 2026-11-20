@@ -1,0 +1,816 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Knicks 2025-26 Dashboard</title>
+<meta name="description" content="Interactive shot, defense and support dashboard for the 2025-26 New York Knicks.">
+<link rel="icon" href="https://cdn.nba.com/logos/nba/1610612752/primary/L/logo.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/plotly.js-dist-min@2.35.2/plotly.min.js"></script>
+<style>
+  :root {
+    /* Knicks brand (chrome) */
+    --nyk-blue: #006bb6; --nyk-orange: #f58426; --nyk-silver: #bec0c2;
+    /* surfaces */
+    --bg: #07111f; --card: #0e1d33; --card-2: #132743; --line: #1f3657;
+    --ink: #eef2f7; --ink-2: #a9b8cc; --ink-3: #6f84a0;
+    /* data series (validated on --card) */
+    --s1: #2b8ee8; --s2: #e0701c; --s3: #22a37f; --s4: #9b7bea;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 14px/1.5 Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+    background-image:
+      radial-gradient(1200px 500px at 85% -10%, rgba(245,132,38,.10), transparent 60%),
+      radial-gradient(900px 500px at 0% 0%, rgba(0,107,182,.22), transparent 60%);
+    background-attachment: fixed;
+  }
+  .wrap { max-width: 1440px; margin: 0 auto; padding: 0 20px 48px; }
+
+  /* ---------- header ---------- */
+  header.hero {
+    display: flex; align-items: center; gap: 20px; padding: 28px 0 22px;
+    border-bottom: 3px solid var(--nyk-orange); margin-bottom: 18px;
+  }
+  header.hero img.logo { width: 84px; height: 84px; filter: drop-shadow(0 6px 18px rgba(0,0,0,.45)); }
+  .kicker { margin: 0; color: var(--nyk-orange); font: 600 13px/1 Oswald, sans-serif; letter-spacing: .18em; text-transform: uppercase; }
+  h1 { margin: 6px 0 4px; font: 700 clamp(26px, 4vw, 44px)/1.05 Oswald, sans-serif; letter-spacing: .01em; text-transform: uppercase; }
+  h1 span { color: var(--nyk-orange); }
+  .hero .sub { margin: 0; color: var(--ink-2); }
+  .record { margin-left: auto; display: flex; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
+  .pill { background: var(--card); border: 1px solid var(--line); border-radius: 999px; padding: 8px 14px; font-weight: 600; white-space: nowrap; }
+  .pill b { font: 600 18px Oswald, sans-serif; color: var(--ink); margin-right: 4px; }
+  .pill.w b { color: var(--nyk-orange); }
+
+  /* ---------- filter bar ---------- */
+  .filters {
+    position: sticky; top: 0; z-index: 20; margin: 0 -20px 20px; padding: 12px 20px;
+    background: rgba(7,17,31,.88); backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--line);
+  }
+  .frow { display: flex; gap: 18px; align-items: center; flex-wrap: wrap; }
+  .fgroup { display: flex; gap: 8px; align-items: center; }
+  .flabel { color: var(--ink-3); font: 600 11px Oswald, sans-serif; letter-spacing: .14em; text-transform: uppercase; }
+  select {
+    background: var(--card); color: var(--ink); border: 1px solid var(--line); border-radius: 8px;
+    padding: 8px 10px; font: inherit; min-width: 230px; cursor: pointer;
+  }
+  .chip {
+    border: 1px solid var(--line); background: var(--card); color: var(--ink-2); border-radius: 8px;
+    padding: 7px 12px; font: 600 13px Inter, sans-serif; cursor: pointer; transition: .15s;
+  }
+  .chip:hover { border-color: var(--s1); color: var(--ink); }
+  .chip.on { background: var(--nyk-blue); border-color: var(--nyk-blue); color: #fff; }
+  .chip.reset { margin-left: auto; }
+  .chip.reset:hover { border-color: var(--nyk-orange); }
+  .toggle { display: flex; align-items: center; gap: 8px; color: var(--ink-2); cursor: pointer; user-select: none; }
+  .toggle input { accent-color: var(--nyk-orange); width: 16px; height: 16px; }
+  .game-badge { display: flex; align-items: center; gap: 6px; color: var(--ink-2); font-weight: 600; }
+  .game-badge img { width: 28px; height: 28px; }
+  .players {
+    display: flex; gap: 8px; overflow-x: auto; padding: 10px 2px 4px; margin-top: 8px;
+    scrollbar-width: thin; scrollbar-color: var(--line) transparent;
+  }
+  .pchip {
+    flex: 0 0 auto; display: flex; align-items: center; gap: 8px; padding: 4px 12px 4px 4px;
+    background: var(--card); border: 1px solid var(--line); border-radius: 999px; cursor: pointer;
+    color: var(--ink-2); font-weight: 600; transition: .15s;
+  }
+  .pchip:hover { border-color: var(--s1); color: var(--ink); }
+  .pchip.on { border-color: var(--nyk-orange); color: var(--ink); box-shadow: 0 0 0 2px var(--nyk-orange) inset; }
+  .pchip .swatch { width: 8px; height: 8px; border-radius: 50%; display: none; }
+  .pchip.on .swatch { display: inline-block; }
+  .face {
+    width: 34px; height: 34px; border-radius: 50%; object-fit: cover; object-position: top;
+    background: linear-gradient(160deg, var(--nyk-blue), #04305a); flex: 0 0 auto;
+  }
+  .face.lg { width: 40px; height: 40px; }
+  .face.ini { display: inline-flex; align-items: center; justify-content: center; color: #fff; font: 600 13px Oswald, sans-serif; }
+  .note { color: var(--nyk-orange); font-size: 12px; margin-top: 6px; min-height: 0; }
+
+  /* ---------- layout ---------- */
+  .section-h { display: flex; align-items: baseline; gap: 12px; margin: 30px 0 12px; }
+  .section-h h2 { margin: 0; font: 700 24px Oswald, sans-serif; text-transform: uppercase; letter-spacing: .04em; }
+  .section-h h2::before { content: ""; display: inline-block; width: 6px; height: 20px; background: var(--nyk-orange); margin-right: 10px; border-radius: 2px; vertical-align: -2px; }
+  .section-h p { margin: 0; color: var(--ink-3); }
+  .grid { display: grid; gap: 16px; }
+  .g-kpi { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
+  .g-off { grid-template-columns: 1.05fr 1fr; }
+  .g-2 { grid-template-columns: 1fr 1fr; }
+  .g-4 { grid-template-columns: repeat(4, 1fr); }
+  @media (max-width: 1100px) { .g-off, .g-2 { grid-template-columns: 1fr; } .g-4 { grid-template-columns: 1fr 1fr; } }
+  @media (max-width: 640px) {
+    .g-4 { grid-template-columns: 1fr; }
+    header.hero { flex-wrap: wrap; } .record { margin-left: 0; justify-content: flex-start; }
+    select { min-width: 0; width: 100%; }
+    .wrap { padding: 0 16px 40px; } .filters { position: static; margin: 0 -16px 16px; padding: 10px 16px; }
+    .fgroup { flex-wrap: wrap; } .game-badge { width: 100%; }
+  }
+  .card {
+    background: linear-gradient(180deg, var(--card-2), var(--card));
+    border: 1px solid var(--line); border-radius: 14px; padding: 16px 18px; min-width: 0;
+  }
+  .card h3 { margin: 0; font: 600 16px Oswald, sans-serif; letter-spacing: .05em; text-transform: uppercase; }
+  .card .desc { margin: 2px 0 8px; color: var(--ink-3); font-size: 13px; }
+  .card-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; flex: 0 0 auto; }
+  .seg button { background: transparent; border: 0; color: var(--ink-2); padding: 5px 10px; font: 600 12px Inter, sans-serif; cursor: pointer; }
+  .seg button.on { background: var(--nyk-blue); color: #fff; }
+  .seg button:disabled { opacity: .35; cursor: not-allowed; }
+  .plot { width: 100%; }
+
+  /* KPI tiles */
+  .kpi { position: relative; overflow: hidden; cursor: default; padding: 14px 16px; }
+  .kpi::after { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--nyk-blue); }
+  .kpi.hot::after { background: var(--nyk-orange); }
+  .kpi .k { color: var(--ink-3); font: 600 11px Oswald, sans-serif; letter-spacing: .14em; text-transform: uppercase; }
+  .kpi .v { font: 600 30px/1.15 Oswald, sans-serif; font-variant-numeric: tabular-nums; }
+  .kpi .s { color: var(--ink-2); font-size: 12px; }
+  .kpi:hover { border-color: var(--s1); }
+
+  .findings { margin-top: 16px; }
+  .findings ul { margin: 8px 0 0; padding: 0; list-style: none; display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+  .findings li { background: rgba(0,0,0,.18); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; color: var(--ink-2); }
+  .findings li b { color: var(--ink); }
+  .findings li .tag { display: block; color: var(--nyk-orange); font: 600 11px Oswald, sans-serif; letter-spacing: .14em; text-transform: uppercase; margin-bottom: 2px; }
+
+  /* leaderboards */
+  .lb ol { list-style: none; margin: 8px 0 0; padding: 0; }
+  .lb li {
+    display: grid; grid-template-columns: 18px 40px 1fr auto; gap: 10px; align-items: center;
+    padding: 7px 6px; border-radius: 10px; cursor: pointer; transition: background .15s;
+  }
+  .lb li:hover { background: rgba(43,142,232,.12); }
+  .lb li.sel { background: rgba(245,132,38,.14); }
+  .lb .rank { color: var(--ink-3); font: 600 14px Oswald, sans-serif; text-align: center; }
+  .lb li:first-child .rank { color: var(--nyk-orange); }
+  .lb .nm { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .lb .bar { height: 4px; border-radius: 2px; background: var(--line); margin-top: 5px; overflow: hidden; }
+  .lb .bar i { display: block; height: 100%; background: var(--s1); border-radius: 2px; }
+  .lb li:first-child .bar i { background: var(--nyk-orange); }
+  .lb .val { font: 600 20px Oswald, sans-serif; font-variant-numeric: tabular-nums; text-align: right; }
+  .lb .val small { display: block; color: var(--ink-3); font: 500 11px Inter, sans-serif; }
+  .lb .empty { color: var(--ink-3); padding: 12px 6px; }
+
+  /* tooltip */
+  #tip {
+    position: fixed; z-index: 50; pointer-events: none; opacity: 0; transition: opacity .12s;
+    background: #0a1628; border: 1px solid var(--s1); border-radius: 10px; padding: 10px 12px;
+    color: var(--ink); font-size: 13px; max-width: 280px; box-shadow: 0 10px 30px rgba(0,0,0,.5);
+  }
+  #tip .t { font: 600 14px Oswald, sans-serif; letter-spacing: .04em; margin-bottom: 4px; display: flex; align-items: center; gap: 8px; }
+  #tip .row { display: flex; justify-content: space-between; gap: 16px; color: var(--ink-2); }
+  #tip .row b { color: var(--ink); font-variant-numeric: tabular-nums; }
+
+  footer { margin-top: 36px; padding-top: 16px; border-top: 1px solid var(--line); color: var(--ink-3); font-size: 12px; display: flex; gap: 12px; flex-wrap: wrap; justify-content: space-between; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="hero">
+    <img class="logo" src="https://cdn.nba.com/logos/nba/1610612752/primary/L/logo.svg" alt="New York Knicks logo">
+    <div>
+      <p class="kicker">New York Knicks · 2025-26</p>
+      <h1>Knicks <span>Championship Run</span></h1>
+      <p class="sub">Offense, defense and playmaking from every possession of the season. Hover anything for details.</p>
+    </div>
+    <div class="record" id="record"></div>
+  </header>
+
+  <div class="filters" id="filters">
+    <div class="frow">
+      <div class="fgroup">
+        <span class="flabel">Game</span>
+        <select id="gameSel" aria-label="Game"></select>
+        <span class="game-badge" id="gameBadge"></span>
+      </div>
+      <div class="fgroup" id="qGroup">
+        <span class="flabel">Quarter</span>
+      </div>
+      <label class="toggle" title="With 2+ players or quarters selected, charts draw one series per selection">
+        <input type="checkbox" id="compareChk" checked> Compare selections
+      </label>
+      <button class="chip reset" id="resetBtn">Reset filters</button>
+    </div>
+    <div class="players" id="playerRow" aria-label="Players"></div>
+    <div class="note" id="note"></div>
+  </div>
+
+  <!-- KEY FINDINGS -->
+  <div class="section-h"><h2>Key Findings</h2><p id="scopeText"></p></div>
+  <div class="grid g-kpi" id="kpis"></div>
+  <div class="card findings"><h3>What stands out</h3><ul id="findings"></ul></div>
+
+  <!-- OFFENSE -->
+  <div class="section-h"><h2>Offense</h2><p>Where, how, and when the Knicks scored</p></div>
+  <div class="grid g-off">
+    <div class="card">
+      <div class="card-head">
+        <div><h3>Shot Heatmap</h3><p class="desc">Color = shot volume per 2.5 ft zone. Hover a zone for makes and FG%.</p></div>
+      </div>
+      <div id="heat" class="plot"></div>
+    </div>
+    <div class="card">
+      <div class="card-head">
+        <div><h3>Made vs Missed by Shot Type</h3><p class="desc" id="radarDesc"></p></div>
+        <div class="seg" id="radarSeg"><button data-v="volume" class="on">Volume</button><button data-v="pct">FG%</button></div>
+      </div>
+      <div id="radar" class="plot"></div>
+    </div>
+  </div>
+  <div class="card" style="margin-top:16px">
+    <div class="card-head">
+      <div><h3>Efficiency Throughout the Game</h3><p class="desc" id="effDesc"></p></div>
+      <div class="seg" id="effSeg"><button data-v="pct" class="on">FG%</button><button data-v="mm">Made / Missed</button></div>
+    </div>
+    <div id="eff" class="plot"></div>
+  </div>
+
+  <!-- DEFENSE -->
+  <div class="section-h"><h2>Defense</h2><p>Who controlled the glass and created stops</p></div>
+  <div class="grid g-2">
+    <div class="card"><h3>Rebounds</h3><p class="desc">Offensive and defensive boards per player.</p><div id="reb" class="plot"></div></div>
+    <div class="card"><h3>Steals &amp; Blocks</h3><p class="desc">Side by side for each player.</p><div id="stk" class="plot"></div></div>
+  </div>
+
+  <!-- SUPPORT -->
+  <div class="section-h"><h2>Support</h2><p>Who set up whom, and for what kind of shot</p></div>
+  <div class="card"><h3>Assists by Shot Type</h3><p class="desc">What each passer's assists turned into. Hover for their favorite target.</p><div id="ast" class="plot"></div></div>
+
+  <!-- LEADERBOARDS -->
+  <div class="section-h"><h2>Leaderboards</h2><p>Click a player to filter the dashboard</p></div>
+  <div class="grid g-4">
+    <div class="card lb"><h3>Offensive</h3><p class="desc">Points per game</p><ol id="lbOff"></ol></div>
+    <div class="card lb"><h3>Defensive</h3><p class="desc">Def. rebounds + steals + blocks per game</p><ol id="lbDef"></ol></div>
+    <div class="card lb"><h3>Support</h3><p class="desc">Assists per game</p><ol id="lbSup"></ol></div>
+    <div class="card lb"><h3>Shot Efficiency</h3><p class="desc" id="lbEffDesc">True shooting %</p><ol id="lbEff"></ol></div>
+  </div>
+
+  <footer>
+    <span>Source: NBA play-by-play, 2025-26 regular season. Per-game values use games the player appeared in.</span>
+    <span>Fan-made class project · not affiliated with the NBA or the New York Knicks.</span>
+  </footer>
+</div>
+<div id="tip"></div>
+
+<script>
+const D = /*__DATA__*/null;
+const S = D.shots, E = D.events, P = D.players, G = D.games, CATS = D.cats;
+const NS = S.g.length, NE = E.g.length;
+
+const C = { blue: '#2b8ee8', orange: '#e0701c', green: '#22a37f', violet: '#9b7bea',
+            ink: '#eef2f7', ink2: '#a9b8cc', ink3: '#6f84a0', line: '#1f3657', card: '#0e1d33' };
+const PAL = [C.blue, C.orange, C.green, C.violet];
+const QNAME = { 1: 'Q1', 2: 'Q2', 3: 'Q3', 4: 'Q4', 5: 'OT' };
+const MAX_SERIES = 4;
+
+const headshot = id => `https://cdn.nba.com/headshots/nba/latest/260x190/${id}.png`;
+const teamLogo = id => `https://cdn.nba.com/logos/nba/${id}/primary/L/logo.svg`;
+const pct = (m, a, d = 1) => a ? (100 * m / a).toFixed(d) + '%' : '–';
+const fmt = n => n.toLocaleString('en-US');
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const gameLabel = g => `${g.home ? 'vs' : '@'} ${g.opp} · ${g.win ? 'W' : 'L'} ${g.pts}-${g.oppPts}${g.ot ? ' (OT)' : ''}`;
+
+const state = { game: -1, quarters: new Set(), players: new Set(), compare: true, radar: 'volume', eff: 'pct' };
+
+/* ------------------------------------------------------------ filtering */
+const okGQ = (g, q) => (state.game < 0 || g === state.game) && (!state.quarters.size || state.quarters.has(q));
+const okP = p => !state.players.size || state.players.has(p);
+
+/** Series to draw: one per selected player / quarter in compare mode, else one "Knicks" series. */
+function seriesList() {
+  if (state.compare && state.players.size >= 2)
+    return [...state.players].slice(0, MAX_SERIES).map((p, i) => ({
+      label: P[p].last, color: PAL[i], test: (pp, q) => pp === p }));
+  if (state.compare && state.quarters.size >= 2)
+    return [...state.quarters].sort().slice(0, MAX_SERIES).map((q, i) => ({
+      label: QNAME[q], color: PAL[i], test: (pp, qq) => qq === q }));
+  return [{ label: state.players.size === 1 ? P[[...state.players][0]].last : 'Knicks', color: C.blue, test: () => true }];
+}
+const comparing = () => seriesList().length > 1;
+
+function filteredShots() {
+  const idx = [];
+  for (let i = 0; i < NS; i++) if (okGQ(S.g[i], S.q[i]) && okP(S.p[i])) idx.push(i);
+  return idx;
+}
+function gamesInScope() { return state.game >= 0 ? [state.game] : G.map((_, i) => i); }
+/** Games each player appeared in, within the game filter. */
+function gamesPlayed() {
+  const gp = new Array(P.length).fill(0);
+  for (const gi of gamesInScope()) for (const p of G[gi].players) gp[p]++;
+  return gp;
+}
+
+/** Per-player box score for the current game/quarter filter (player filter NOT applied). */
+function boxScores() {
+  const z = () => ({ pts: 0, fgm: 0, fga: 0, tpm: 0, tpa: 0, ftm: 0, fta: 0, ast: 0, oreb: 0, dreb: 0, stl: 0, blk: 0, tov: 0, pf: 0, targets: {} });
+  const B = P.map(z);
+  for (let i = 0; i < NS; i++) {
+    if (!okGQ(S.g[i], S.q[i])) continue;
+    const b = B[S.p[i]], m = S.m[i];
+    if (S.c[i] === 0) { b.fta++; b.ftm += m; b.pts += m; continue; }
+    b.fga++; b.fgm += m; b.pts += m * S.v[i];
+    if (S.v[i] === 3) { b.tpa++; b.tpm += m; }
+    if (m && S.a[i] >= 0) { const a = B[S.a[i]]; a.ast++; a.targets[S.p[i]] = (a.targets[S.p[i]] || 0) + 1; }
+  }
+  const K = ['oreb', 'dreb', 'stl', 'blk', 'tov', 'pf'];
+  for (let i = 0; i < NE; i++) if (okGQ(E.g[i], E.q[i])) B[E.p[i]][K[E.k[i]]]++;
+  return B;
+}
+const topTarget = b => {
+  let best = -1, n = 0;
+  for (const [p, c] of Object.entries(b.targets)) if (c > n) { n = c; best = +p; }
+  return best >= 0 ? { p: best, n } : null;
+};
+
+/* ------------------------------------------------------------ plotly helpers */
+const CONFIG = { displayModeBar: false, responsive: true };
+function baseLayout(extra = {}) {
+  return Object.assign({
+    paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)',
+    font: { family: 'Inter, sans-serif', color: C.ink2, size: 12 },
+    margin: { l: 50, r: 16, t: 10, b: 40 },
+    hoverlabel: { bgcolor: '#0a1628', bordercolor: C.blue, font: { color: C.ink, family: 'Inter', size: 13 }, align: 'left' },
+    legend: { orientation: 'h', y: 1.08, x: 0, font: { color: C.ink2 } },
+    xaxis: { gridcolor: C.line, zerolinecolor: C.line, linecolor: C.line, tickcolor: C.line },
+    yaxis: { gridcolor: C.line, zerolinecolor: C.line, linecolor: C.line, tickcolor: C.line },
+    bargap: 0.25,
+  }, extra);
+}
+const draw = (id, traces, layout) => {
+  // responsive mode sizes the chart to its container, so the container needs the height
+  document.getElementById(id).style.height = layout.height + 'px';
+  return Plotly.react(id, traces, layout, CONFIG);
+};
+
+/* ------------------------------------------------------------ court */
+function arc(cx, cy, r, a0, a1, n = 60) {
+  let d = '';
+  for (let i = 0; i <= n; i++) {
+    const t = (a0 + (a1 - a0) * i / n) * Math.PI / 180;
+    d += (i ? ' L ' : 'M ') + (cx + r * Math.cos(t)).toFixed(1) + ' ' + (cy + r * Math.sin(t)).toFixed(1);
+  }
+  return d;
+}
+function courtShapes() {
+  const L = { color: 'rgba(238,242,247,.45)', width: 1.5 };
+  const corner = Math.acos(220 / 237.5) * 180 / Math.PI;  // where the arc meets the corner lines
+  const yc = 237.5 * Math.sin(corner * Math.PI / 180);
+  return [
+    { type: 'rect', x0: -250, x1: 250, y0: -47.5, y1: 422.5, line: L },
+    { type: 'rect', x0: -80, x1: 80, y0: -47.5, y1: 142.5, line: L },
+    { type: 'rect', x0: -60, x1: 60, y0: -47.5, y1: 142.5, line: L },
+    { type: 'path', path: arc(0, 142.5, 60, 0, 180), line: L },
+    { type: 'path', path: arc(0, 142.5, 60, 180, 360), line: Object.assign({ dash: 'dot' }, L) },
+    { type: 'path', path: arc(0, 0, 40, 0, 180), line: L },
+    { type: 'circle', x0: -7.5, x1: 7.5, y0: -7.5, y1: 7.5, line: { color: C.orange, width: 2 } },
+    { type: 'line', x0: -30, x1: 30, y0: -12.5, y1: -12.5, line: { color: 'rgba(238,242,247,.7)', width: 2 } },
+    { type: 'line', x0: -220, x1: -220, y0: -47.5, y1: yc, line: L },
+    { type: 'line', x0: 220, x1: 220, y0: -47.5, y1: yc, line: L },
+    { type: 'path', path: arc(0, 0, 237.5, corner, 180 - corner), line: L },
+    { type: 'path', path: arc(0, 422.5, 60, 180, 360), line: L },
+  ];
+}
+
+/* ------------------------------------------------------------ 1. heatmap */
+function drawHeat(idx) {
+  const BIN = 25, X0 = -250, Y0 = -47.5, NX = 20, NY = 19;
+  const att = Array.from({ length: NY }, () => new Array(NX).fill(0));
+  const made = Array.from({ length: NY }, () => new Array(NX).fill(0));
+  let n = 0;
+  for (const i of idx) {
+    if (S.c[i] === 0) continue;
+    const bx = Math.floor((S.x[i] - X0) / BIN), by = Math.floor((S.y[i] - Y0) / BIN);
+    if (bx < 0 || bx >= NX || by < 0 || by >= NY) continue;
+    att[by][bx]++; made[by][bx] += S.m[i]; n++;
+  }
+  const xs = [...Array(NX)].map((_, i) => X0 + BIN * (i + .5));
+  const ys = [...Array(NY)].map((_, i) => Y0 + BIN * (i + .5));
+  // color on a square-root scale so the rim doesn't wash out the rest of the floor
+  const z = att.map(r => r.map(v => v ? Math.sqrt(v) : null));
+  const text = att.map((r, j) => r.map((v, i) => {
+    if (!v) return '';
+    const ft = Math.hypot(xs[i], ys[j]) / 10;
+    return `<b>${ft.toFixed(0)} ft from the rim</b><br>Attempts: <b>${fmt(v)}</b> (${(100 * v / n).toFixed(1)}% of shots)` +
+           `<br>Made: <b>${made[j][i]}</b> · FG%: <b>${pct(made[j][i], v)}</b>`;
+  }));
+  const amax = Math.max(1, ...att.flat()), zmax = Math.sqrt(amax);
+  const ticks = [1, amax / 16, amax / 4, amax].map(v => Math.max(1, Math.round(v)));
+  draw('heat', [{
+    type: 'heatmap', x: xs, y: ys, z, text, hovertemplate: '%{text}<extra></extra>',
+    xgap: 2, ygap: 2, zmin: 0, zmax,
+    colorscale: [[0, '#0f2c4b'], [0.2, '#174f86'], [0.45, '#1f74c4'], [0.7, '#2b8ee8'], [0.88, '#7dbdf5'], [1, '#e2f1ff']],
+    colorbar: { title: { text: 'Attempts', side: 'right', font: { color: C.ink2 } }, thickness: 10, len: .8, outlinewidth: 0,
+                tickfont: { color: C.ink2 }, tickvals: ticks.map(Math.sqrt), ticktext: ticks.map(fmt) },
+  }], baseLayout({
+    height: 470, margin: { l: 6, r: 6, t: 6, b: 6 }, shapes: courtShapes(),
+    xaxis: { range: [-252, 252], visible: false, fixedrange: true },
+    yaxis: { range: [-50, 425], visible: false, scaleanchor: 'x', fixedrange: true },
+    annotations: n ? [] : [{ text: 'No shots for this filter', showarrow: false, font: { color: C.ink3, size: 14 }, x: 0, y: 200 }],
+  }));
+}
+
+/* ------------------------------------------------------------ 2. radar */
+function drawRadar(idx) {
+  const series = seriesList(), cmp = series.length > 1;
+  const theta = [...CATS, CATS[0]];
+  const close = a => [...a, a[0]];
+  const tally = test => {
+    const m = new Array(7).fill(0), a = new Array(7).fill(0);
+    for (const i of idx) if (test(S.p[i], S.q[i])) { a[S.c[i]]++; m[S.c[i]] += S.m[i]; }
+    return { m, a };
+  };
+  const hover = (t, k) => `<b>${CATS[k]}</b><br>Made <b>${t.m[k]}</b> · Missed <b>${t.a[k] - t.m[k]}</b>` +
+                          `<br>Attempts ${fmt(t.a[k])} · FG% <b>${pct(t.m[k], t.a[k])}</b>`;
+  let traces;
+  if (!cmp) {
+    const t = tally(series[0].test);
+    const custom = close(CATS.map((_, k) => hover(t, k)));
+    traces = state.radar === 'volume' ? [
+      { name: 'Missed', r: close(t.a.map((a, k) => a - t.m[k])), line: { color: C.blue, width: 2 }, fillcolor: 'rgba(43,142,232,.22)' },
+      { name: 'Made', r: close(t.m), line: { color: C.orange, width: 2 }, fillcolor: 'rgba(224,112,28,.30)' },
+    ] : [
+      { name: 'FG%', r: close(t.a.map((a, k) => a ? 100 * t.m[k] / a : 0)), line: { color: C.orange, width: 2 }, fillcolor: 'rgba(224,112,28,.28)' },
+    ];
+    traces.forEach(tr => Object.assign(tr, { customdata: custom }));
+  } else {
+    traces = series.map(s => {
+      const t = tally(s.test);
+      const r = state.radar === 'volume' ? t.a : t.a.map((a, k) => a ? 100 * t.m[k] / a : 0);
+      return { name: s.label, r: close(r), line: { color: s.color, width: 2 }, fillcolor: s.color + '26',
+               customdata: close(CATS.map((_, k) => `<span style="color:${s.color}">●</span> ${esc(s.label)}<br>` + hover(t, k))) };
+    });
+  }
+  traces.forEach(tr => Object.assign(tr, {
+    type: 'scatterpolar', theta, fill: 'toself', mode: 'lines+markers', marker: { size: 6 },
+    hovertemplate: '%{customdata}<extra></extra>' }));
+  document.getElementById('radarDesc').textContent = cmp
+    ? (state.radar === 'volume' ? 'Attempts per shot type for each selection.' : 'FG% per shot type for each selection.')
+    : (state.radar === 'volume' ? 'Makes vs misses for each shot type.' : 'How often each shot type went in.');
+  draw('radar', traces, baseLayout({
+    height: 470, margin: { l: 50, r: 50, t: 40, b: 30 }, legend: { orientation: 'h', y: 1.12, x: 0 },
+    polar: {
+      bgcolor: 'rgba(0,0,0,0)',
+      radialaxis: { gridcolor: C.line, linecolor: C.line, tickfont: { color: C.ink3, size: 10 }, angle: 90,
+                    ticksuffix: state.radar === 'pct' ? '%' : '', range: state.radar === 'pct' ? [0, 100] : undefined },
+      angularaxis: { gridcolor: C.line, linecolor: C.line, tickfont: { color: C.ink, size: 12 }, rotation: 90, direction: 'clockwise' },
+    },
+  }));
+}
+
+/* ------------------------------------------------------------ 3. efficiency through the game */
+function minuteOf(t) { return t < 2880 ? Math.floor(t / 60) : 48 + Math.floor(((t - 2880) % 300) / 60); }
+/** Weighted least squares line through (x, y) with weights w. */
+function regress(x, y, w) {
+  let sw = 0, sx = 0, sy = 0, sxx = 0, sxy = 0;
+  for (let i = 0; i < x.length; i++) { const k = w[i]; if (!k) continue; sw += k; sx += k * x[i]; sy += k * y[i]; sxx += k * x[i] * x[i]; sxy += k * x[i] * y[i]; }
+  const den = sw * sxx - sx * sx;
+  if (!sw || !den) return null;
+  const b = (sw * sxy - sx * sy) / den;
+  return { b, a: (sy - b * sx) / sw };
+}
+function drawEff(idx) {
+  const series = seriesList(), cmp = series.length > 1;
+  // OT minutes are shown only for a single game or when OT is selected (otherwise ~1% of shots, very noisy)
+  const showOT = state.game >= 0 || state.quarters.has(5);
+  const fg = idx.filter(i => S.c[i] !== 0 && (showOT || S.t[i] < 2880));
+  const hasOT = fg.some(i => S.t[i] >= 2880);
+  const NM = hasOT ? 53 : 48;
+  const BIN = (fg.length / series.length) > 1500 ? 1 : (fg.length / series.length) > 300 ? 2 : 4;
+  const nb = Math.ceil(NM / BIN);
+  const mmBtn = document.querySelector('#effSeg [data-v="mm"]');
+  mmBtn.disabled = cmp;
+  const mode = cmp ? 'pct' : state.eff;
+  document.querySelectorAll('#effSeg button').forEach(b => b.classList.toggle('on', b.dataset.v === mode));
+
+  const traces = [];
+  for (const s of series) {
+    const a = new Array(nb).fill(0), m = new Array(nb).fill(0);
+    for (const i of fg) if (s.test(S.p[i], S.q[i])) { const b = Math.floor(minuteOf(S.t[i]) / BIN); a[b]++; m[b] += S.m[i]; }
+    const xs = a.map((_, b) => b * BIN + BIN / 2);
+    const lbl = b => BIN === 1 ? `Minute ${b + 1}` : `Minutes ${b * BIN + 1}–${Math.min(NM, (b + 1) * BIN)}`;
+    const hov = a.map((v, b) => `<b>${lbl(b)}</b>${cmp ? ' · ' + esc(s.label) : ''}<br>Made <b>${m[b]}</b> · Missed <b>${v - m[b]}</b><br>FG% <b>${pct(m[b], v)}</b>`);
+    const keep = a.map(v => v > 0);
+    const sel = arr => arr.filter((_, b) => keep[b]);
+    const x = sel(xs);
+    if (!x.length) continue;
+    const xr = [Math.min(...x), Math.max(...x)];  // trend only spans the minutes in the filter
+    if (mode === 'pct') {
+      const y = sel(a.map((v, b) => v ? 100 * m[b] / v : null));
+      traces.push({ type: 'scatter', mode: 'lines+markers', name: cmp ? s.label : 'FG%', x, y, customdata: sel(hov),
+        hovertemplate: '%{customdata}<extra></extra>', line: { color: s.color, width: 2 }, marker: { size: 7, color: s.color, line: { color: C.card, width: 1.5 } } });
+      const r = regress(x, y, sel(a));
+      if (r) traces.push({ type: 'scatter', mode: 'lines', name: `${cmp ? s.label + ' trend' : 'Trend'} (${r.b >= 0 ? '+' : ''}${(r.b * 12).toFixed(1)} pts/qtr)`,
+        x: xr, y: xr.map(v => r.a + r.b * v), line: { color: s.color, width: 2, dash: 'dash' }, opacity: .9, hoverinfo: 'skip' });
+    } else {
+      for (const [name, arr, col] of [['Made', m, C.orange], ['Missed', a.map((v, b) => v - m[b]), C.blue]]) {
+        const y = sel(arr);
+        traces.push({ type: 'scatter', mode: 'lines+markers', name, x, y, customdata: sel(hov), hovertemplate: '%{customdata}<extra></extra>',
+          line: { color: col, width: 2 }, marker: { size: 6, color: col, line: { color: C.card, width: 1.5 } } });
+        const r = regress(x, y, x.map(() => 1));
+        if (r) traces.push({ type: 'scatter', mode: 'lines', name: `${name} trend`, x: xr, y: xr.map(v => r.a + r.b * v),
+          line: { color: col, width: 2, dash: 'dash' }, hoverinfo: 'skip' });
+      }
+    }
+  }
+  document.getElementById('effDesc').textContent = (mode === 'pct'
+    ? 'Field-goal % through the game with a weighted regression trend line'
+    : 'Makes and misses through the game, each with a regression trend line') +
+    (BIN > 1 ? ` · grouped into ${BIN}-minute bins for this sample size.` : '.');
+  const qLines = [12, 24, 36].concat(hasOT ? [48] : []).map(v => ({ type: 'line', x0: v, x1: v, yref: 'paper', y0: 0, y1: 1, line: { color: C.line, width: 2 } }));
+  const qLabels = ['Q1', 'Q2', 'Q3', 'Q4'].concat(hasOT ? ['OT'] : []).map((q, i) => ({
+    text: q, x: i < 4 ? 6 + 12 * i : 50.5, yref: 'paper', y: 1.02, showarrow: false, yanchor: 'bottom',
+    font: { family: 'Oswald', size: 13, color: state.quarters.size && !state.quarters.has(i + 1) ? C.ink3 : C.ink } }));
+  draw('eff', traces, baseLayout({
+    height: 380, margin: { l: 54, r: 16, t: 40, b: 44 }, shapes: qLines, annotations: qLabels,
+    legend: { orientation: 'h', y: -0.2, x: 0 },
+    xaxis: { title: { text: 'Game minute' }, range: [0, NM], dtick: 6, gridcolor: 'rgba(0,0,0,0)', linecolor: C.line, zeroline: false },
+    yaxis: { title: { text: mode === 'pct' ? 'FG%' : 'Shots' }, ticksuffix: mode === 'pct' ? '%' : '', gridcolor: C.line, zeroline: false },
+    hovermode: 'closest',
+  }));
+}
+
+/* ------------------------------------------------------------ 4/5. defense */
+const gapFor = n => n <= 2 ? 0.6 : n <= 4 ? 0.45 : 0.25;  // keep bars slim when few players are shown
+function scopedPlayers(B, key, n = 10) {
+  return P.map((_, i) => i).filter(i => okP(i) && key(B[i]) > 0).sort((a, b) => key(B[b]) - key(B[a])).slice(0, n);
+}
+function drawDefense(B) {
+  const rp = scopedPlayers(B, b => b.oreb + b.dreb).reverse();
+  const names = rp.map(i => P[i].name);
+  const rh = (i, kind) => {
+    const b = B[i], tot = b.oreb + b.dreb;
+    return `<b>${esc(P[i].name)}</b><br>${kind}<br>Offensive <b>${b.oreb}</b> · Defensive <b>${b.dreb}</b><br>Total <b>${tot}</b> · ${pct(b.oreb, tot, 0)} offensive`;
+  };
+  const bar = (name, vals, color, kind) => ({ type: 'bar', orientation: 'h', name, y: names, x: vals,
+    marker: { color, line: { color: C.card, width: 2 } }, customdata: rp.map(i => rh(i, kind)), hovertemplate: '%{customdata}<extra></extra>' });
+  draw('reb', [bar('Defensive', rp.map(i => B[i].dreb), C.blue, 'Defensive rebounds'), bar('Offensive', rp.map(i => B[i].oreb), C.orange, 'Offensive rebounds')],
+    baseLayout({ barmode: 'stack', bargap: gapFor(rp.length), height: 400, margin: { l: 110, r: 16, t: 30, b: 36 }, xaxis: { gridcolor: C.line, zeroline: false, title: { text: 'Rebounds' } },
+      yaxis: { gridcolor: 'rgba(0,0,0,0)', automargin: true }, legend: { orientation: 'h', y: 1.1, x: 0, traceorder: 'normal' } }));
+
+  const sp = scopedPlayers(B, b => b.stl + b.blk);
+  const gp = gamesPlayed();
+  const sh = i => { const b = B[i], g = Math.max(gp[i], 1);
+    return `<b>${esc(P[i].name)}</b><br>Steals <b>${b.stl}</b> (${(b.stl / g).toFixed(1)}/g)<br>Blocks <b>${b.blk}</b> (${(b.blk / g).toFixed(1)}/g)<br>Games: ${gp[i]}`; };
+  const sb = (name, key, color) => ({ type: 'bar', name, x: sp.map(i => P[i].last), y: sp.map(i => B[i][key]), marker: { color, line: { color: C.card, width: 2 } },
+    customdata: sp.map(sh), hovertemplate: '%{customdata}<extra></extra>' });
+  draw('stk', [sb('Steals', 'stl', C.blue), sb('Blocks', 'blk', C.orange)],
+    baseLayout({ barmode: 'group', bargroupgap: 0.08, bargap: gapFor(sp.length), height: 400, margin: { l: 44, r: 16, t: 30, b: 60 },
+      xaxis: { gridcolor: 'rgba(0,0,0,0)', tickangle: -30 }, yaxis: { gridcolor: C.line, zeroline: false }, legend: { orientation: 'h', y: 1.1, x: 0 } }));
+}
+
+/* ------------------------------------------------------------ 6. assists by shot type */
+const AST_GROUPS = [
+  { name: 'At the rim (layup / dunk)', cats: [1, 2], color: C.orange },
+  { name: 'Short & mid-range (hook / floater / midrange)', cats: [3, 4, 5], color: C.green },
+  { name: '3-pointer', cats: [6], color: C.blue },
+];
+function drawAssists(B) {
+  const counts = P.map(() => [0, 0, 0]);
+  const detail = P.map(() => new Array(7).fill(0));
+  for (let i = 0; i < NS; i++) {
+    const a = S.a[i];
+    if (a < 0 || !S.m[i] || !okGQ(S.g[i], S.q[i]) || !okP(a)) continue;
+    detail[a][S.c[i]]++;
+    counts[a][AST_GROUPS.findIndex(gr => gr.cats.includes(S.c[i]))]++;
+  }
+  const ps = P.map((_, i) => i).filter(i => counts[i].some(v => v)).sort((x, y) => sum(counts[y]) - sum(counts[x])).slice(0, 10).reverse();
+  const hov = (i, gi) => {
+    const tot = sum(counts[i]), t = topTarget(B[i]);
+    const parts = AST_GROUPS[gi].cats.map(c => `${CATS[c]} ${detail[i][c]}`).join(' · ');
+    return `<b>${esc(P[i].name)}</b> · ${tot} assists<br>${AST_GROUPS[gi].name}: <b>${counts[i][gi]}</b> (${pct(counts[i][gi], tot, 0)})<br>${parts}` +
+           (t ? `<br>Favorite target: <b>${esc(P[t.p].name)}</b> (${t.n})` : '');
+  };
+  draw('ast', AST_GROUPS.map((gr, gi) => ({
+    type: 'bar', orientation: 'h', name: gr.name, y: ps.map(i => P[i].name), x: ps.map(i => counts[i][gi]),
+    marker: { color: gr.color, line: { color: C.card, width: 2 } }, customdata: ps.map(i => hov(i, gi)), hovertemplate: '%{customdata}<extra></extra>',
+  })), baseLayout({ barmode: 'stack', bargap: gapFor(ps.length), height: Math.max(220, 70 + ps.length * 34), margin: { l: 110, r: 16, t: 34, b: 36 },
+    xaxis: { gridcolor: C.line, zeroline: false, title: { text: 'Assists' } }, yaxis: { gridcolor: 'rgba(0,0,0,0)', automargin: true },
+    legend: { orientation: 'h', y: 1.12, x: 0, traceorder: 'normal' } }));
+}
+const sum = a => a.reduce((x, y) => x + y, 0);
+
+/* ------------------------------------------------------------ KPIs + findings */
+function teamTotals(idx) {
+  const T = { pts: 0, fgm: 0, fga: 0, tpm: 0, tpa: 0, ftm: 0, fta: 0, ast: 0, oreb: 0, dreb: 0, stl: 0, blk: 0, tov: 0, pf: 0 };
+  for (const i of idx) {
+    const m = S.m[i];
+    if (S.c[i] === 0) { T.fta++; T.ftm += m; T.pts += m; continue; }
+    T.fga++; T.fgm += m; T.pts += m * S.v[i];
+    if (S.v[i] === 3) { T.tpa++; T.tpm += m; }
+    if (m && S.a[i] >= 0) T.ast++;
+  }
+  const K = ['oreb', 'dreb', 'stl', 'blk', 'tov', 'pf'];
+  for (let i = 0; i < NE; i++) if (okGQ(E.g[i], E.q[i]) && okP(E.p[i])) T[K[E.k[i]]]++;
+  return T;
+}
+function drawKPIs(idx) {
+  const T = teamTotals(idx), ng = gamesInScope().length;
+  const pg = v => (v / ng).toFixed(1) + ' / game';
+  const efg = T.fga ? (T.fgm + 0.5 * T.tpm) / T.fga : 0;
+  const ts = (T.fga + 0.44 * T.fta) ? T.pts / (2 * (T.fga + 0.44 * T.fta)) : 0;
+  const tiles = [
+    { k: 'Points', v: fmt(T.pts), s: pg(T.pts), hot: true, tip: [['From 2', fmt(2 * (T.fgm - T.tpm))], ['From 3', fmt(3 * T.tpm)], ['From the line', fmt(T.ftm)]] },
+    { k: 'FG%', v: pct(T.fgm, T.fga), s: `${fmt(T.fgm)} / ${fmt(T.fga)}`, tip: [['Effective FG%', (100 * efg).toFixed(1) + '%'], ['True shooting', (100 * ts).toFixed(1) + '%'], ['Missed', fmt(T.fga - T.fgm)]] },
+    { k: '3-Pointers', v: fmt(T.tpm), s: `${pct(T.tpm, T.tpa)} on ${fmt(T.tpa)}`, tip: [['Made / game', (T.tpm / ng).toFixed(1)], ['Attempts / game', (T.tpa / ng).toFixed(1)], ['Share of FGA', pct(T.tpa, T.fga)]] },
+    { k: 'Free Throws', v: pct(T.ftm, T.fta), s: `${fmt(T.ftm)} / ${fmt(T.fta)}`, tip: [['Made / game', (T.ftm / ng).toFixed(1)], ['FT rate (FTA/FGA)', T.fga ? (T.fta / T.fga).toFixed(2) : '–']] },
+    { k: 'Assists', v: fmt(T.ast), s: pg(T.ast), tip: [['Assisted FG%', pct(T.ast, T.fgm)], ['AST / TOV', T.tov ? (T.ast / T.tov).toFixed(2) : '–']] },
+    { k: 'Rebounds', v: fmt(T.oreb + T.dreb), s: pg(T.oreb + T.dreb), tip: [['Offensive', fmt(T.oreb)], ['Defensive', fmt(T.dreb)], ['Offensive share', pct(T.oreb, T.oreb + T.dreb)]] },
+    { k: 'Steals', v: fmt(T.stl), s: pg(T.stl), tip: [['Per game', (T.stl / ng).toFixed(1)]] },
+    { k: 'Blocks', v: fmt(T.blk), s: pg(T.blk), tip: [['Per game', (T.blk / ng).toFixed(1)]] },
+    { k: 'Turnovers', v: fmt(T.tov), s: pg(T.tov), tip: [['Per game', (T.tov / ng).toFixed(1)], ['Fouls committed', fmt(T.pf)]] },
+  ];
+  document.getElementById('kpis').innerHTML = tiles.map((t, i) =>
+    `<div class="card kpi${t.hot ? ' hot' : ''}" data-tipi="${i}"><div class="k">${t.k}</div><div class="v">${t.v}</div><div class="s">${t.s}</div></div>`).join('');
+  document.querySelectorAll('#kpis .kpi').forEach(el => {
+    const t = tiles[+el.dataset.tipi];
+    bindTip(el, () => `<div class="t">${t.k}</div>` + t.tip.map(([a, b]) => `<div class="row">${a}<b>${b}</b></div>`).join(''));
+  });
+  return T;
+}
+
+function drawFindings(idx, B) {
+  const out = [];
+  const fg = idx.filter(i => S.c[i] !== 0);
+  // best quarter
+  const qa = {}, qm = {};
+  for (const i of fg) { qa[S.q[i]] = (qa[S.q[i]] || 0) + 1; qm[S.q[i]] = (qm[S.q[i]] || 0) + S.m[i]; }
+  // OT only counts when explicitly selected (tiny sample otherwise)
+  const qs = Object.keys(qa).filter(q => qa[q] >= 20 && (q !== '5' || state.quarters.has(5)));
+  if (qs.length > 1) {
+    qs.sort((a, b) => qm[b] / qa[b] - qm[a] / qa[a]);
+    const b = qs[0], w = qs[qs.length - 1];
+    out.push(['Best quarter', `<b>${QNAME[b]}</b> at ${pct(qm[b], qa[b])} FG, vs ${pct(qm[w], qa[w])} in ${QNAME[w]}.`]);
+  }
+  // most efficient shot type with meaningful volume
+  const ca = new Array(7).fill(0), cm = new Array(7).fill(0);
+  for (const i of fg) { ca[S.c[i]]++; cm[S.c[i]] += S.m[i]; }
+  const ok = [1, 2, 3, 4, 5, 6].filter(c => ca[c] >= Math.max(5, fg.length * 0.04));
+  if (ok.length) {
+    const vol = ok.slice().sort((a, b) => ca[b] - ca[a])[0];
+    const bestPts = ok.slice().sort((a, b) => cm[b] * (b === 6 ? 3 : 2) / ca[b] - cm[a] * (a === 6 ? 3 : 2) / ca[a])[0];
+    out.push(['Go-to shot', `<b>${CATS[vol]}</b>: ${pct(ca[vol], fg.length, 0)} of attempts, ${pct(cm[vol], ca[vol])} FG.`]);
+    out.push(['Most points per shot', `<b>${CATS[bestPts]}</b> at ${(cm[bestPts] * (bestPts === 6 ? 3 : 2) / ca[bestPts]).toFixed(2)} points per attempt.`]);
+  }
+  // top connection
+  const pairs = {};
+  for (const i of idx) if (S.m[i] && S.a[i] >= 0) { const k = S.a[i] + '>' + S.p[i]; pairs[k] = (pairs[k] || 0) + 1; }
+  const top = Object.entries(pairs).sort((a, b) => b[1] - a[1])[0];
+  if (top) { const [a, p] = top[0].split('>').map(Number); out.push(['Top connection', `<b>${esc(P[a].last)} → ${esc(P[p].last)}</b> on ${top[1]} assisted buckets.`]); }
+  // trend
+  const x = fg.map(i => minuteOf(S.t[i])), y = fg.map(i => 100 * S.m[i]);
+  const r = fg.length > 30 ? regress(x, y, x.map(() => 1)) : null;
+  if (r) out.push(['Trend', `FG% ${r.b >= 0 ? 'rises' : 'falls'} about <b>${Math.abs(r.b * 12).toFixed(1)} pts per quarter</b> as the game goes on.`]);
+  // glass
+  const reb = P.map((_, i) => i).filter(okP).sort((a, b) => (B[b].oreb + B[b].dreb) - (B[a].oreb + B[a].dreb))[0];
+  if (reb !== undefined && B[reb].oreb + B[reb].dreb > 0) out.push(['Glass cleaner', `<b>${esc(P[reb].name)}</b> with ${B[reb].oreb + B[reb].dreb} boards (${B[reb].oreb} offensive).`]);
+  document.getElementById('findings').innerHTML = out.length
+    ? out.map(([t, h]) => `<li><span class="tag">${t}</span>${h}</li>`).join('')
+    : '<li>Not enough data for this filter.</li>';
+}
+
+/* ------------------------------------------------------------ leaderboards */
+function drawLeaderboards(B) {
+  const gp = gamesPlayed();
+  const per = (i, v) => v / Math.max(gp[i], 1);
+  const tsa = b => b.fga + 0.44 * b.fta;
+  const totalFga = sum(B.map(b => b.fga));
+  const minAtt = Math.max(5, Math.round(totalFga * 0.03));
+  document.getElementById('lbEffDesc').textContent = `True shooting % · min ${minAtt} FGA`;
+  const boards = [
+    { id: 'lbOff', val: i => per(i, B[i].pts), show: v => v.toFixed(1), sub: i => `${B[i].pts} pts`,
+      tip: i => [['Points', B[i].pts], ['FG', `${B[i].fgm}/${B[i].fga} (${pct(B[i].fgm, B[i].fga)})`], ['3PT', `${B[i].tpm}/${B[i].tpa}`], ['FT', `${B[i].ftm}/${B[i].fta}`]] },
+    { id: 'lbDef', val: i => per(i, B[i].dreb + B[i].stl + B[i].blk), show: v => v.toFixed(1), sub: i => `${B[i].dreb + B[i].stl + B[i].blk} total`,
+      tip: i => [['Def. rebounds', B[i].dreb], ['Off. rebounds', B[i].oreb], ['Steals', B[i].stl], ['Blocks', B[i].blk]] },
+    { id: 'lbSup', val: i => per(i, B[i].ast), show: v => v.toFixed(1), sub: i => `${B[i].ast} ast`,
+      tip: i => { const t = topTarget(B[i]); return [['Assists', B[i].ast], ['Turnovers', B[i].tov], ['AST/TOV', B[i].tov ? (B[i].ast / B[i].tov).toFixed(2) : '–'], ['Top target', t ? `${P[t.p].last} (${t.n})` : '–']]; } },
+    { id: 'lbEff', val: i => B[i].fga >= minAtt ? B[i].pts / (2 * tsa(B[i])) : 0, show: v => (100 * v).toFixed(1) + '%', sub: i => `${B[i].fga} FGA`,
+      tip: i => [['True shooting', (100 * B[i].pts / (2 * tsa(B[i]))).toFixed(1) + '%'], ['FG%', pct(B[i].fgm, B[i].fga)], ['3P%', pct(B[i].tpm, B[i].tpa)], ['FT%', pct(B[i].ftm, B[i].fta)], ['eFG%', B[i].fga ? (100 * (B[i].fgm + .5 * B[i].tpm) / B[i].fga).toFixed(1) + '%' : '–']] },
+  ];
+  for (const bd of boards) {
+    const ranked = P.map((_, i) => i).filter(i => bd.val(i) > 0).sort((a, b) => bd.val(b) - bd.val(a)).slice(0, 5);
+    const el = document.getElementById(bd.id);
+    if (!ranked.length) { el.innerHTML = '<li class="empty">No data for this filter</li>'; continue; }
+    const max = bd.val(ranked[0]);
+    el.innerHTML = ranked.map((i, r) => `<li data-p="${i}" class="${state.players.has(i) ? 'sel' : ''}">
+      <span class="rank">${r + 1}</span>${face(P[i], 'lg')}
+      <div style="min-width:0"><div class="nm">${esc(P[i].name)}</div><div class="bar"><i style="width:${(100 * bd.val(i) / max).toFixed(1)}%"></i></div></div>
+      <div class="val">${bd.show(bd.val(i))}<small>${bd.sub(i)}</small></div></li>`).join('');
+    el.querySelectorAll('li[data-p]').forEach(li => {
+      const i = +li.dataset.p;
+      li.onclick = () => togglePlayer(i);
+      bindTip(li, () => `<div class="t">${face(P[i])}${esc(P[i].name)}</div><div class="row">Games<b>${gp[i]}</b></div>` +
+        bd.tip(i).map(([a, b]) => `<div class="row">${a}<b>${b}</b></div>`).join(''));
+    });
+  }
+}
+
+/* ------------------------------------------------------------ tooltip */
+const tip = document.getElementById('tip');
+addEventListener('scroll', () => { tip.style.opacity = 0; }, { passive: true });
+function bindTip(el, html) {
+  el.addEventListener('mouseenter', () => { tip.innerHTML = html(); tip.style.opacity = 1; });
+  el.addEventListener('mousemove', e => {
+    const w = tip.offsetWidth, h = tip.offsetHeight;
+    let x = e.clientX + 14, y = e.clientY + 14;
+    if (x + w > innerWidth - 8) x = e.clientX - w - 14;
+    if (y + h > innerHeight - 8) y = e.clientY - h - 14;
+    tip.style.left = x + 'px'; tip.style.top = y + 'px';
+  });
+  el.addEventListener('mouseleave', () => { tip.style.opacity = 0; });
+}
+function face(p, cls = '') {
+  const ini = p.name.split(' ').map(s => s[0]).join('');
+  return `<img class="face ${cls}" src="${headshot(p.id)}" alt="" loading="lazy" ` +
+         `onerror="this.outerHTML='<span class=&quot;face ${cls} ini&quot;>${ini}</span>'">`;
+}
+
+/* ------------------------------------------------------------ filter UI */
+function buildFilters() {
+  const W = G.filter(g => g.win).length;
+  document.getElementById('record').innerHTML =
+    `<span class="pill w"><b>${W}-${G.length - W}</b>record</span>` +
+    `<span class="pill"><b>${(sum(G.map(g => g.pts)) / G.length).toFixed(1)}</b>PPG</span>` +
+    `<span class="pill"><b>${((sum(G.map(g => g.pts)) - sum(G.map(g => g.oppPts))) / G.length).toFixed(1)}</b>net / game</span>`;
+
+  const sel = document.getElementById('gameSel');
+  sel.innerHTML = `<option value="-1">All ${G.length} games</option>` + G.map((g, i) => `<option value="${i}">G${i + 1} · ${gameLabel(g)}</option>`).join('');
+  sel.onchange = () => { state.game = +sel.value; render(); };
+
+  const qg = document.getElementById('qGroup');
+  for (const q of [1, 2, 3, 4, 5]) {
+    const b = document.createElement('button');
+    b.className = 'chip'; b.textContent = QNAME[q]; b.dataset.q = q;
+    b.onclick = () => { state.quarters.has(q) ? state.quarters.delete(q) : state.quarters.add(q); render(); };
+    qg.appendChild(b);
+  }
+
+  const row = document.getElementById('playerRow');
+  row.innerHTML = P.map((p, i) => `<button class="pchip" data-p="${i}">${face(p)}<span class="swatch"></span>${esc(p.name)}</button>`).join('');
+  row.querySelectorAll('.pchip').forEach(el => {
+    const i = +el.dataset.p;
+    el.onclick = () => togglePlayer(i);
+  });
+
+  document.getElementById('compareChk').onchange = e => { state.compare = e.target.checked; render(); };
+  document.getElementById('resetBtn').onclick = () => {
+    state.game = -1; state.quarters.clear(); state.players.clear(); sel.value = '-1'; render();
+  };
+  for (const [id, key] of [['radarSeg', 'radar'], ['effSeg', 'eff']])
+    document.querySelectorAll(`#${id} button`).forEach(b => b.onclick = () => {
+      if (b.disabled) return;
+      state[key] = b.dataset.v;
+      document.querySelectorAll(`#${id} button`).forEach(x => x.classList.toggle('on', x === b));
+      render();
+    });
+}
+function togglePlayer(i) { state.players.has(i) ? state.players.delete(i) : state.players.add(i); render(); }
+
+function syncFilters() {
+  document.querySelectorAll('#qGroup .chip').forEach(b => b.classList.toggle('on', state.quarters.has(+b.dataset.q)));
+  const series = seriesList(), byPlayer = state.compare && state.players.size >= 2;
+  const order = [...state.players];
+  document.querySelectorAll('#playerRow .pchip').forEach(el => {
+    const i = +el.dataset.p, on = state.players.has(i);
+    el.classList.toggle('on', on);
+    const k = order.indexOf(i);
+    const sw = el.querySelector('.swatch');
+    sw.style.background = byPlayer && k >= 0 && k < MAX_SERIES ? PAL[k] : 'transparent';
+  });
+  const g = state.game >= 0 ? G[state.game] : null;
+  document.getElementById('gameBadge').innerHTML = g ? `<img src="${teamLogo(g.oppId)}" alt="${g.opp} logo">${g.win ? 'W' : 'L'} ${g.pts}-${g.oppPts}` : '';
+  const many = (state.compare && state.players.size > MAX_SERIES) || (state.compare && state.players.size < 2 && state.quarters.size > MAX_SERIES);
+  document.getElementById('note').textContent = many ? `Comparing the first ${MAX_SERIES} selections; the rest are still included in totals and leaderboards.` : '';
+  const parts = [g ? `G${state.game + 1} ${gameLabel(g)}` : `All ${G.length} games`];
+  if (state.quarters.size) parts.push([...state.quarters].sort().map(q => QNAME[q]).join(', '));
+  if (state.players.size) parts.push([...state.players].map(i => P[i].last).join(', '));
+  document.getElementById('scopeText').textContent = parts.join(' · ');
+  return series;
+}
+
+/* ------------------------------------------------------------ render */
+function render() {
+  syncFilters();
+  const idx = filteredShots();
+  const B = boxScores();
+  drawKPIs(idx);
+  drawFindings(idx, B);
+  drawHeat(idx);
+  drawRadar(idx);
+  drawEff(idx);
+  drawDefense(B);
+  drawAssists(B);
+  drawLeaderboards(B);
+}
+
+buildFilters();
+render();
+</script>
+</body>
+</html>

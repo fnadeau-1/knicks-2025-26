@@ -26,7 +26,7 @@ from matplotlib.patches import Arc, Circle, Rectangle
 TEAM = "NYK"
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
-SMALL_DATA = ROOT / "data" / "nyk_2026.csv"
+GAMES_DATA = ROOT / "data" / "nyk_games_2026.csv"
 FULL_DATA = ROOT / "archive (1)" / "pbp2026.csv"
 
 BLUE = "#2a78d6"     # primary series color
@@ -48,16 +48,24 @@ plt.rcParams.update({
 
 
 # ---------------------------------------------------------------- data
-def load_team_rows() -> pd.DataFrame:
-    """Knicks play-by-play rows. Builds the small CSV from the full archive once."""
-    if SMALL_DATA.exists():
-        return pd.read_csv(SMALL_DATA, dtype={"gameid": str})
+def load_games() -> pd.DataFrame:
+    """Every play-by-play row from Knicks games (both teams), in file order.
+    Builds the small CSV from the full archive once."""
+    if GAMES_DATA.exists():
+        return pd.read_csv(GAMES_DATA, dtype={"gameid": str})
     df = pd.read_csv(FULL_DATA, dtype={"gameid": str})
-    nyk = df[df["team"] == TEAM].copy()
-    SMALL_DATA.parent.mkdir(exist_ok=True)
-    nyk.to_csv(SMALL_DATA, index=False)
-    print(f"Wrote {SMALL_DATA} ({len(nyk):,} rows)")
-    return nyk
+    ids = df.loc[df["team"] == TEAM, "gameid"].unique()
+    games = df[df["gameid"].isin(ids)].copy()
+    GAMES_DATA.parent.mkdir(exist_ok=True)
+    games.to_csv(GAMES_DATA, index=False)
+    print(f"Wrote {GAMES_DATA} ({len(games):,} rows)")
+    return games
+
+
+def load_team_rows() -> pd.DataFrame:
+    """Knicks rows only."""
+    games = load_games()
+    return games[games["team"] == TEAM].copy()
 
 
 def prepare(nyk: pd.DataFrame):
