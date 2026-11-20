@@ -1,0 +1,10 @@
+# Render Blueprint: static site built by the Python chart code.
+services:
+  - type: web
+    runtime: static
+    name: knicks-2026
+    buildCommand: pip install -r requirements.txt && python code/build_site.py
+    staticPublishPath: site
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.13.5

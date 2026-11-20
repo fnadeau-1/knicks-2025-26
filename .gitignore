@@ -1,0 +1,7 @@
+# full play-by-play archive is ~2GB; only data/nyk_2026.csv is committed
+archive (1)/
+.venv/
+__pycache__/
+# generated output
+site/
+code/charts/
