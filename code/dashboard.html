@@ -47,18 +47,28 @@
   .pill b { font: 600 18px Oswald, sans-serif; color: var(--ink); margin-right: 4px; }
   .pill.w b { color: var(--nyk-orange); }
 
-  /* ---------- filter bar ---------- */
-  .filters {
-    position: sticky; top: 0; z-index: 20; margin: 0 -20px 20px; padding: 12px 20px;
-    background: rgba(7,17,31,.88); backdrop-filter: blur(10px);
-    border-bottom: 1px solid var(--line);
+  /* ---------- sidebar ---------- */
+  .layout { display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 24px; align-items: start; }
+  .sidebar {
+    position: sticky; top: 0; max-height: 100vh; overflow-y: auto; padding: 16px 6px 24px 0;
+    display: flex; flex-direction: column; gap: 12px;
+    scrollbar-width: thin; scrollbar-color: var(--line) transparent;
   }
-  .frow { display: flex; gap: 18px; align-items: center; flex-wrap: wrap; }
-  .fgroup { display: flex; gap: 8px; align-items: center; }
+  .sb-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .sb-title { margin: 0; font: 700 20px Oswald, sans-serif; text-transform: uppercase; letter-spacing: .05em; }
+  .sb-sec {
+    background: linear-gradient(180deg, var(--card-2), var(--card));
+    border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px;
+  }
+  .sb-sec-h { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
   .flabel { color: var(--ink-3); font: 600 11px Oswald, sans-serif; letter-spacing: .14em; text-transform: uppercase; }
+  .flabel em { font-style: normal; color: var(--nyk-orange); margin-left: 4px; }
+  .link { background: none; border: 0; padding: 2px 0; color: var(--ink-3); font: 600 12px Inter, sans-serif; cursor: pointer; }
+  .link:hover { color: var(--nyk-orange); }
+  .icon-btn { display: none; background: var(--card); border: 1px solid var(--line); color: var(--ink); border-radius: 8px; width: 32px; height: 32px; font-size: 18px; cursor: pointer; }
   select {
     background: var(--card); color: var(--ink); border: 1px solid var(--line); border-radius: 8px;
-    padding: 8px 10px; font: inherit; min-width: 230px; cursor: pointer;
+    padding: 8px 10px; font: inherit; width: 100%; cursor: pointer;
   }
   .chip {
     border: 1px solid var(--line); background: var(--card); color: var(--ink-2); border-radius: 8px;
@@ -66,32 +76,72 @@
   }
   .chip:hover { border-color: var(--s1); color: var(--ink); }
   .chip.on { background: var(--nyk-blue); border-color: var(--nyk-blue); color: #fff; }
-  .chip.reset { margin-left: auto; }
   .chip.reset:hover { border-color: var(--nyk-orange); }
-  .toggle { display: flex; align-items: center; gap: 8px; color: var(--ink-2); cursor: pointer; user-select: none; }
-  .toggle input { accent-color: var(--nyk-orange); width: 16px; height: 16px; }
-  .game-badge { display: flex; align-items: center; gap: 6px; color: var(--ink-2); font-weight: 600; }
+  .active-list { display: flex; flex-wrap: wrap; gap: 6px; }
+  .active-list .none { color: var(--ink-3); font-size: 13px; }
+  .tag-x {
+    display: inline-flex; align-items: center; gap: 6px; padding: 4px 6px 4px 10px; border-radius: 999px;
+    background: rgba(245,132,38,.14); border: 1px solid rgba(245,132,38,.45); color: var(--ink);
+    font: 600 12px Inter, sans-serif; cursor: pointer;
+  }
+  .tag-x span { color: var(--ink-3); font-size: 14px; line-height: 1; }
+  .tag-x:hover span { color: var(--nyk-orange); }
+  .seg.full { display: flex; width: 100%; }
+  .seg.full button { flex: 1; padding: 7px 0; }
+  .hint { color: var(--ink-3); font-size: 12px; margin: 8px 0 0; }
+  .hint b { color: var(--ink); }
+  .game-badge { display: flex; align-items: center; gap: 6px; color: var(--ink-2); font-weight: 600; margin-top: 8px; }
+  .game-badge:empty { display: none; }
   .game-badge img { width: 28px; height: 28px; }
-  .players {
-    display: flex; gap: 8px; overflow-x: auto; padding: 10px 2px 4px; margin-top: 8px;
-    scrollbar-width: thin; scrollbar-color: var(--line) transparent;
+  .qgrid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+  .qgrid .chip { padding: 7px 0; text-align: center; }
+  .psearch {
+    width: 100%; margin-bottom: 8px; background: var(--card); color: var(--ink); border: 1px solid var(--line);
+    border-radius: 8px; padding: 8px 10px; font: inherit;
   }
-  .pchip {
-    flex: 0 0 auto; display: flex; align-items: center; gap: 8px; padding: 4px 12px 4px 4px;
-    background: var(--card); border: 1px solid var(--line); border-radius: 999px; cursor: pointer;
-    color: var(--ink-2); font-weight: 600; transition: .15s;
+  .psearch:focus, select:focus { outline: none; border-color: var(--s1); }
+  .plist { display: flex; flex-direction: column; gap: 2px; }
+  .prow {
+    display: grid; grid-template-columns: 34px 1fr 18px; gap: 10px; align-items: center; width: 100%;
+    padding: 4px 8px 4px 4px; border-radius: 10px; border: 1px solid transparent; background: none;
+    color: var(--ink-2); font: inherit; text-align: left; cursor: pointer; transition: background .15s;
   }
-  .pchip:hover { border-color: var(--s1); color: var(--ink); }
-  .pchip.on { border-color: var(--nyk-orange); color: var(--ink); box-shadow: 0 0 0 2px var(--nyk-orange) inset; }
-  .pchip .swatch { width: 8px; height: 8px; border-radius: 50%; display: none; }
-  .pchip.on .swatch { display: inline-block; }
+  .prow:hover { background: rgba(43,142,232,.10); color: var(--ink); }
+  .prow.on { background: rgba(245,132,38,.10); border-color: rgba(245,132,38,.45); color: var(--ink); }
+  .prow .nm { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .prow small { display: block; color: var(--ink-3); font-size: 11px; }
+  .prow .check {
+    width: 18px; height: 18px; border-radius: 5px; border: 1.5px solid var(--line);
+    display: grid; place-items: center; color: #fff; font-size: 12px; font-weight: 700;
+  }
+  .prow.on .check { background: var(--sw, var(--nyk-orange)); border-color: var(--sw, var(--nyk-orange)); }
+  .prow.hide { display: none; }
+  .fab {
+    display: none; position: fixed; right: 16px; bottom: 16px; z-index: 30; align-items: center; gap: 8px;
+    background: var(--nyk-orange); color: #07111f; border: 0; border-radius: 999px; padding: 12px 18px;
+    font: 600 15px Oswald, sans-serif; letter-spacing: .06em; text-transform: uppercase; cursor: pointer;
+    box-shadow: 0 10px 30px rgba(0,0,0,.5);
+  }
+  .fab b { background: #07111f; color: var(--nyk-orange); border-radius: 999px; padding: 0 7px; font-size: 13px; }
+  .fab b:empty { display: none; }
+  .sb-backdrop { display: none; position: fixed; inset: 0; z-index: 35; background: rgba(0,0,0,.55); }
+  @media (max-width: 960px) {
+    .layout { grid-template-columns: 1fr; }
+    .sidebar {
+      position: fixed; z-index: 40; left: 0; top: 0; bottom: 0; width: min(320px, 88vw); max-height: none;
+      padding: 16px; background: var(--bg); border-right: 1px solid var(--line);
+      transform: translateX(-105%); transition: transform .2s ease;
+    }
+    body.sb-open .sidebar { transform: none; }
+    body.sb-open .sb-backdrop { display: block; }
+    .fab, .icon-btn { display: inline-flex; align-items: center; justify-content: center; }
+  }
   .face {
     width: 34px; height: 34px; border-radius: 50%; object-fit: cover; object-position: top;
     background: linear-gradient(160deg, var(--nyk-blue), #04305a); flex: 0 0 auto;
   }
   .face.lg { width: 40px; height: 40px; }
   .face.ini { display: inline-flex; align-items: center; justify-content: center; color: #fff; font: 600 13px Oswald, sans-serif; }
-  .note { color: var(--nyk-orange); font-size: 12px; margin-top: 6px; min-height: 0; }
 
   /* ---------- layout ---------- */
   .section-h { display: flex; align-items: baseline; gap: 12px; margin: 30px 0 12px; }
@@ -107,9 +157,7 @@
   @media (max-width: 640px) {
     .g-4 { grid-template-columns: 1fr; }
     header.hero { flex-wrap: wrap; } .record { margin-left: 0; justify-content: flex-start; }
-    select { min-width: 0; width: 100%; }
-    .wrap { padding: 0 16px 40px; } .filters { position: static; margin: 0 -16px 16px; padding: 10px 16px; }
-    .fgroup { flex-wrap: wrap; } .game-badge { width: 100%; }
+    .wrap { padding: 0 16px 40px; }
   }
   .card {
     background: linear-gradient(180deg, var(--card-2), var(--card));
@@ -182,25 +230,50 @@
     <div class="record" id="record"></div>
   </header>
 
-  <div class="filters" id="filters">
-    <div class="frow">
-      <div class="fgroup">
-        <span class="flabel">Game</span>
-        <select id="gameSel" aria-label="Game"></select>
-        <span class="game-badge" id="gameBadge"></span>
+  <div class="layout">
+  <aside class="sidebar" id="sidebar" aria-label="Filters and comparisons">
+    <div class="sb-head">
+      <h2 class="sb-title">Filters</h2>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button class="chip reset" id="resetBtn">Reset all</button>
+        <button class="icon-btn" id="sbClose" aria-label="Close filters">×</button>
       </div>
-      <div class="fgroup" id="qGroup">
-        <span class="flabel">Quarter</span>
-      </div>
-      <label class="toggle" title="With 2+ players or quarters selected, charts draw one series per selection">
-        <input type="checkbox" id="compareChk" checked> Compare selections
-      </label>
-      <button class="chip reset" id="resetBtn">Reset filters</button>
     </div>
-    <div class="players" id="playerRow" aria-label="Players"></div>
-    <div class="note" id="note"></div>
-  </div>
 
+    <div class="sb-sec">
+      <div class="sb-sec-h"><span class="flabel">Active filters</span></div>
+      <div class="active-list" id="activeList"></div>
+    </div>
+
+    <div class="sb-sec">
+      <div class="sb-sec-h"><span class="flabel">Compare by</span></div>
+      <div class="seg full" id="cmpSeg">
+        <button data-v="off">Off</button><button data-v="players" class="on">Players</button><button data-v="quarters">Quarters</button>
+      </div>
+      <p class="hint" id="cmpHint"></p>
+    </div>
+
+    <div class="sb-sec">
+      <div class="sb-sec-h"><span class="flabel">Game</span></div>
+      <select id="gameSel" aria-label="Game"></select>
+      <div class="game-badge" id="gameBadge"></div>
+    </div>
+
+    <div class="sb-sec">
+      <div class="sb-sec-h"><span class="flabel">Quarters<em id="qCount"></em></span><button class="link" id="qClear">Clear</button></div>
+      <div class="qgrid" id="qGroup"></div>
+    </div>
+
+    <div class="sb-sec">
+      <div class="sb-sec-h"><span class="flabel">Players<em id="pCount"></em></span><button class="link" id="pClear">Clear</button></div>
+      <input class="psearch" id="pSearch" type="search" placeholder="Search players…" aria-label="Search players">
+      <div class="plist" id="playerList"></div>
+    </div>
+  </aside>
+  <div class="sb-backdrop" id="sbBackdrop"></div>
+  <button class="fab" id="fab" aria-label="Open filters">Filters <b id="fabCount"></b></button>
+
+  <main>
   <!-- KEY FINDINGS -->
   <div class="section-h"><h2>Key Findings</h2><p id="scopeText"></p></div>
   <div class="grid g-kpi" id="kpis"></div>
@@ -255,6 +328,8 @@
     <span>Source: NBA play-by-play, 2025-26 regular season. Per-game values use games the player appeared in.</span>
     <span>Fan-made class project · not affiliated with the NBA or the New York Knicks.</span>
   </footer>
+  </main>
+  </div>
 </div>
 <div id="tip"></div>
 
@@ -276,18 +351,20 @@ const fmt = n => n.toLocaleString('en-US');
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const gameLabel = g => `${g.home ? 'vs' : '@'} ${g.opp} · ${g.win ? 'W' : 'L'} ${g.pts}-${g.oppPts}${g.ot ? ' (OT)' : ''}`;
 
-const state = { game: -1, quarters: new Set(), players: new Set(), compare: true, radar: 'volume', eff: 'pct' };
+const state = { game: -1, quarters: new Set(), players: new Set(), compareBy: 'players', radar: 'volume', eff: 'pct' };
 
 /* ------------------------------------------------------------ filtering */
 const okGQ = (g, q) => (state.game < 0 || g === state.game) && (!state.quarters.size || state.quarters.has(q));
 const okP = p => !state.players.size || state.players.has(p);
 
 /** Series to draw: one per selected player / quarter in compare mode, else one "Knicks" series. */
+const byPlayers = () => state.compareBy === 'players' && state.players.size >= 2;
+const byQuarters = () => state.compareBy === 'quarters' && state.quarters.size >= 2;
 function seriesList() {
-  if (state.compare && state.players.size >= 2)
+  if (byPlayers())
     return [...state.players].slice(0, MAX_SERIES).map((p, i) => ({
       label: P[p].last, color: PAL[i], test: (pp, q) => pp === p }));
-  if (state.compare && state.quarters.size >= 2)
+  if (byQuarters())
     return [...state.quarters].sort().slice(0, MAX_SERIES).map((q, i) => ({
       label: QNAME[q], color: PAL[i], test: (pp, qq) => qq === q }));
   return [{ label: state.players.size === 1 ? P[[...state.players][0]].last : 'Knicks', color: C.blue, test: () => true }];
@@ -743,6 +820,14 @@ function buildFilters() {
   sel.innerHTML = `<option value="-1">All ${G.length} games</option>` + G.map((g, i) => `<option value="${i}">G${i + 1} · ${gameLabel(g)}</option>`).join('');
   sel.onchange = () => { state.game = +sel.value; render(); };
 
+  // compare mode
+  document.querySelectorAll('#cmpSeg button').forEach(b => b.onclick = () => {
+    state.compareBy = b.dataset.v;
+    // switching to quarter comparison with nothing picked: start from all four quarters
+    if (state.compareBy === 'quarters' && state.quarters.size < 2) [1, 2, 3, 4].forEach(q => state.quarters.add(q));
+    render();
+  });
+
   const qg = document.getElementById('qGroup');
   for (const q of [1, 2, 3, 4, 5]) {
     const b = document.createElement('button');
@@ -750,18 +835,45 @@ function buildFilters() {
     b.onclick = () => { state.quarters.has(q) ? state.quarters.delete(q) : state.quarters.add(q); render(); };
     qg.appendChild(b);
   }
+  document.getElementById('qClear').onclick = () => { state.quarters.clear(); render(); };
 
-  const row = document.getElementById('playerRow');
-  row.innerHTML = P.map((p, i) => `<button class="pchip" data-p="${i}">${face(p)}<span class="swatch"></span>${esc(p.name)}</button>`).join('');
-  row.querySelectorAll('.pchip').forEach(el => {
-    const i = +el.dataset.p;
-    el.onclick = () => togglePlayer(i);
-  });
-
-  document.getElementById('compareChk').onchange = e => { state.compare = e.target.checked; render(); };
-  document.getElementById('resetBtn').onclick = () => {
-    state.game = -1; state.quarters.clear(); state.players.clear(); sel.value = '-1'; render();
+  // players (already ordered by season points)
+  const gp = new Array(P.length).fill(0);
+  for (const g of G) for (const p of g.players) gp[p]++;
+  const list = document.getElementById('playerList');
+  list.innerHTML = P.map((p, i) => `<button class="prow" data-p="${i}" data-name="${esc(p.name.toLowerCase())}">${face(p)}
+    <span style="min-width:0"><span class="nm">${esc(p.name)}</span><small>${gp[i] ? (p.pts / gp[i]).toFixed(1) : '0.0'} PPG · ${gp[i]} GP</small></span>
+    <span class="check"></span></button>`).join('');
+  list.querySelectorAll('.prow').forEach(el => { el.onclick = () => togglePlayer(+el.dataset.p); });
+  const search = document.getElementById('pSearch');
+  search.oninput = () => {
+    const q = search.value.trim().toLowerCase();
+    list.querySelectorAll('.prow').forEach(el => el.classList.toggle('hide', !!q && !el.dataset.name.includes(q)));
   };
+  document.getElementById('pClear').onclick = () => { state.players.clear(); render(); };
+
+  // active filter tags: click to remove
+  document.getElementById('activeList').onclick = e => {
+    const t = e.target.closest('[data-k]');
+    if (!t) return;
+    const [k, v] = t.dataset.k.split(':');
+    if (k === 'g') { state.game = -1; sel.value = '-1'; }
+    if (k === 'q') state.quarters.delete(+v);
+    if (k === 'p') state.players.delete(+v);
+    render();
+  };
+
+  document.getElementById('resetBtn').onclick = () => {
+    state.game = -1; state.quarters.clear(); state.players.clear(); sel.value = '-1';
+    search.value = ''; search.oninput(); render();
+  };
+
+  // mobile drawer
+  const setOpen = open => document.body.classList.toggle('sb-open', open);
+  document.getElementById('fab').onclick = () => setOpen(true);
+  document.getElementById('sbClose').onclick = () => setOpen(false);
+  document.getElementById('sbBackdrop').onclick = () => setOpen(false);
+  addEventListener('keydown', e => { if (e.key === 'Escape') setOpen(false); });
   for (const [id, key] of [['radarSeg', 'radar'], ['effSeg', 'eff']])
     document.querySelectorAll(`#${id} button`).forEach(b => b.onclick = () => {
       if (b.disabled) return;
@@ -773,20 +885,46 @@ function buildFilters() {
 function togglePlayer(i) { state.players.has(i) ? state.players.delete(i) : state.players.add(i); render(); }
 
 function syncFilters() {
-  document.querySelectorAll('#qGroup .chip').forEach(b => b.classList.toggle('on', state.quarters.has(+b.dataset.q)));
-  const series = seriesList(), byPlayer = state.compare && state.players.size >= 2;
-  const order = [...state.players];
-  document.querySelectorAll('#playerRow .pchip').forEach(el => {
-    const i = +el.dataset.p, on = state.players.has(i);
-    el.classList.toggle('on', on);
-    const k = order.indexOf(i);
-    const sw = el.querySelector('.swatch');
-    sw.style.background = byPlayer && k >= 0 && k < MAX_SERIES ? PAL[k] : 'transparent';
+  const series = seriesList(), bp = byPlayers(), bq = byQuarters();
+  // compare mode
+  document.querySelectorAll('#cmpSeg button').forEach(b => b.classList.toggle('on', b.dataset.v === state.compareBy));
+  const nP = state.players.size, nQ = state.quarters.size;
+  const over = n => n > MAX_SERIES ? ` Only the first ${MAX_SERIES} are charted as series; the rest still count in totals and leaderboards.` : '';
+  document.getElementById('cmpHint').innerHTML =
+    state.compareBy === 'off' ? 'Charts show one combined series for everything selected.'
+    : state.compareBy === 'players' ? (bp ? `Comparing <b>${Math.min(nP, MAX_SERIES)}</b> players side by side.${over(nP)}`
+                                          : `Pick <b>2–${MAX_SERIES}</b> players below to compare them (${nP} selected).`)
+    : (bq ? `Comparing <b>${Math.min(nQ, MAX_SERIES)}</b> quarters side by side.${over(nQ)}`
+          : `Pick <b>2–${MAX_SERIES}</b> quarters below to compare them (${nQ} selected).`);
+  // quarters
+  const qOrder = [...state.quarters].sort();
+  document.querySelectorAll('#qGroup .chip').forEach(b => {
+    const q = +b.dataset.q, k = qOrder.indexOf(q);
+    b.classList.toggle('on', state.quarters.has(q));
+    b.style.boxShadow = bq && k >= 0 && k < MAX_SERIES ? `inset 0 -3px 0 ${PAL[k]}` : '';
   });
+  document.getElementById('qCount').textContent = nQ ? `· ${nQ}` : '';
+  // players
+  const order = [...state.players];
+  document.querySelectorAll('#playerList .prow').forEach(el => {
+    const i = +el.dataset.p, on = state.players.has(i), k = order.indexOf(i);
+    el.classList.toggle('on', on);
+    el.querySelector('.check').textContent = on ? '✓' : '';
+    if (bp && k >= 0 && k < MAX_SERIES) el.style.setProperty('--sw', PAL[k]); else el.style.removeProperty('--sw');
+  });
+  document.getElementById('pCount').textContent = nP ? `· ${nP}` : '';
+  // game
   const g = state.game >= 0 ? G[state.game] : null;
   document.getElementById('gameBadge').innerHTML = g ? `<img src="${teamLogo(g.oppId)}" alt="${g.opp} logo">${g.win ? 'W' : 'L'} ${g.pts}-${g.oppPts}` : '';
-  const many = (state.compare && state.players.size > MAX_SERIES) || (state.compare && state.players.size < 2 && state.quarters.size > MAX_SERIES);
-  document.getElementById('note').textContent = many ? `Comparing the first ${MAX_SERIES} selections; the rest are still included in totals and leaderboards.` : '';
+  // active filter tags
+  const tags = [];
+  if (g) tags.push(['g', `G${state.game + 1} ${g.home ? 'vs' : '@'} ${g.opp}`]);
+  for (const q of qOrder) tags.push([`q:${q}`, QNAME[q]]);
+  for (const p of order) tags.push([`p:${p}`, P[p].last]);
+  document.getElementById('activeList').innerHTML = tags.length
+    ? tags.map(([k, l]) => `<button class="tag-x" data-k="${k}" title="Remove">${esc(l)}<span>×</span></button>`).join('')
+    : `<span class="none">None — showing the full season.</span>`;
+  document.getElementById('fabCount').textContent = tags.length || '';
   const parts = [g ? `G${state.game + 1} ${gameLabel(g)}` : `All ${G.length} games`];
   if (state.quarters.size) parts.push([...state.quarters].sort().map(q => QNAME[q]).join(', '));
   if (state.players.size) parts.push([...state.players].map(i => P[i].last).join(', '));
